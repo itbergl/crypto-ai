@@ -1,19 +1,28 @@
 class Bot:
+
     def __init__(self, params=None):
-        self._aud = 100
+        self._starting_aud = 100
+        self._aud = self._starting_aud
+
         self._btc = 0
         self.fee = 0.02
         self.params = params
         self._previous_signal = 'sell'
 
     def buy(self, t, price):
+        if self._aud == 0:
+            return 
+        
         self._btc = self._aud * (1 - self.fee) / price
-        print(f'Day {t}: buy {round(self._btc, 5)} BTC, spend {round(self._aud, 3)} AUD')
+        print(f'Day {t:03}\tbuy\t{self._btc:.5f} BTC\t{self._aud:.3f} AUD spent')
         self._aud = 0
 
     def sell(self, t, price):
+        if self._btc == 0:
+            return 
+        
         self._aud = self._btc * price * (1 - self.fee)
-        print(f'Day {t}: sell {round(self._btc, 5)} BTC, get {round(self._aud, 3)} AUD')
+        print(f'Day {t:03}\tsell\t{self._btc:.5f} BTC\t{self._aud:.3f} AUD recieved')
         self._btc = 0
 
     def trigger(self, position):
@@ -29,6 +38,7 @@ class Bot:
             self.buy(t, price)
             self._previous_signal = 'buy'
             return
+        
         signal = self.trigger(position)
         if signal is None:
             return
@@ -38,8 +48,14 @@ class Bot:
             self.sell(t, price)
         self._previous_signal = signal
 
-    def get_aud(self):
+    @property
+    def aud(self):
         return self._aud
 
-    def get_btc(self):
+    @property
+    def btc(self):
         return self._btc
+    
+    # @property
+    # def roi(self):
+    #     return self._aud / self._starting_aud 
