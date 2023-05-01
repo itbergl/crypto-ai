@@ -34,11 +34,6 @@ class Bot:
             return None
 
     def step(self, t, position, price):
-        if t == 0:
-            self.buy(t, price)
-            self._previous_signal = 'buy'
-            return
-        
         signal = self.trigger(position)
         if signal is None:
             return
