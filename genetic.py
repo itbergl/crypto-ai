@@ -85,14 +85,14 @@ def get_indicator_and_candle_values_from_gene(gene: Gene, indicators_and_candle_
 		indicators_and_candle_values[l][0],
 	)
 	
-def fitness(df: pd.DataFrame, gene: Gene, indicators_and_candle_values: StrSeriesPairs) -> float:
+def fitness(df_rows: list, gene: Gene, indicators_and_candle_values: StrSeriesPairs) -> float:
 	'''
 	Calculate the amount of money at the end of all the trades starting with $100.
 	'''
 	amount = 100.
 	buy_trigger = False
 	a, b, c, d, e, f, g, h, i, j, k, l = get_indicator_and_candle_values_from_gene(gene, indicators_and_candle_values)
-	for _, row in df.iterrows():
+	for row in df_rows:
 		if not buy_trigger and not np.isnan(row[c]) and not np.isnan(row[f]) and row[a] > b * row[c] and row[d] > e * row[f]:
 			amount -= amount * 0.02
 			amount /= row['close']
