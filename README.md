@@ -6,3 +6,4 @@ An AI bitcoin price predictor for CITS4404 - AI and Adaptive Systems, Assignment
 
 - itbergl (22710992@student.uwa.edu.au)
 - moebuta - wenxiao (22792191@student.uwa.edu.au)
+- Kaiqi-Liang (kaiqi.liang@outlook.com)
