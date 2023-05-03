@@ -3,7 +3,6 @@ import pandas as pd
 import numpy as np
 from data import StrSeriesPairs
 
-POPULATION = 500
 Gene = list[int, float, int, int, float, int, int, float, int, int, float, int]
 Population = list[Gene]
 
@@ -33,7 +32,7 @@ def find_median(value, values):
 	'''
 	If the value is `0` or `NAN` find another value that is not, otherwise return `0`.
 	'''
-	if value != 0 and np.isnan(value):
+	if value != 0 and not np.isnan(value):
 		return value
 	for val in values:
 		if val != 0 and not np.isnan(val):
@@ -46,7 +45,7 @@ def rand_indicator_or_candle_val(indicators_and_candle_values: StrSeriesPairs):
 	'''
 	return random.randrange(0, len(indicators_and_candle_values))
 
-def evaluate(df: pd.DataFrame, pool: Population, indicators_and_candle_values: StrSeriesPairs):
+def evaluate(df_rows: list, pool: Population, indicators_and_candle_values: StrSeriesPairs):
 	'''
 	Call the fitness evaluation for each gene in the pool and return the restuls in fitnesses.
 	Add up the total fitness sum of all the genes in the whole generation and find the best one to return.
@@ -54,9 +53,9 @@ def evaluate(df: pd.DataFrame, pool: Population, indicators_and_candle_values: S
 	max_pos = 0
 	max_fit = 0.
 	fit_sum = 0.
-	fitnesses = [0. for _ in range(POPULATION)]
-	for i in range(POPULATION):
-		fitnesses[i] = fitness(df, pool[i], indicators_and_candle_values)
+	fitnesses = [0. for _ in range(len(pool))]
+	for i in range(len(pool)):
+		fitnesses[i] = fitness(df_rows, pool[i], indicators_and_candle_values)
 		fit_sum += fitnesses[i]
 		if fitnesses[i] > max_fit:
 			max_fit = fitnesses[i]
@@ -127,11 +126,11 @@ def crossover(g1: Gene, g2: Gene, pos: int, next: Population):
 	next[pos] = [*[g1[i] for i in range(cut)], *[g2[i] for i in range(cut, len(g1))]]
 	next[pos + 1] = [*[g2[i] for i in range(cut)], *[g1[i] for i in range(cut, len(g1))]]
 
-def mutation(pool: Population, indicators_and_candle_values: StrSeriesPairs):
+def mutation(pool: Population, indicators_and_candle_values: StrSeriesPairs, n_mutations: int):
 	'''
-	Randomly change one of the constant values in each of the `5` genes picked randomly from the pool.
+	Randomly change one of the constant values in each of the `n_rand` genes picked randomly from the pool.
  	'''
-	for _ in range(5):
-		i = random.randrange(0, POPULATION)
+	for _ in range(n_mutations):
+		i = random.randrange(0, len(pool))
 		j = random.choice((1, 4, 7, 10))
 		pool[i][j] = rand_constant(pool[i][j - 1], pool[i][j + 1], indicators_and_candle_values)

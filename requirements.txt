@@ -2,3 +2,5 @@ ccxt
 ta
 pandas
 numpy
+optuna
+optuna-dashboard
