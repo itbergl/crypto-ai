@@ -1,6 +1,6 @@
 import pandas as pd
 from tqdm import tqdm
-from data import retrieve_data, list_indicators_and_candle_values, add_all_indicators
+from data import retrieve_data, list_indicators_and_candle_values, add_all_indicators, save_data
 from genetic import POPULATION, Population, rand_trigger, evaluate, selection, crossover, mutation, get_indicator_and_candle_values_from_gene
 
 MAX_ITER = 30
@@ -28,9 +28,17 @@ if __name__=='__main__':
 	]
 	next_gen: Population = [[] for _ in range(POPULATION)]
 
+	# record bot values for visualisation
+	bot_record = []
+
 	# Run genetic algorithm for some number of iterations
 	for _ in tqdm(range(MAX_ITER), total=MAX_ITER):
 		max_pos, max_fit, fit_sum, fitnesses = evaluate(df_rows, pool, indicators_and_candle_values)
+
+		# append the value record of the best bot
+		item = {'max_pos': max_pos, 'max_fit': max_fit, 'fit_sum': fit_sum, 'fitnesses': fitnesses}
+		bot_record.append(item)
+
 		# Preserve best gene and replicate it so it appears twice in the next generation
 		next_gen[0] = pool[max_pos]
 		# Do crossover for the rest of genes and mutate a small amount of them randomly
@@ -45,3 +53,5 @@ if __name__=='__main__':
 	a, b, c, d, e, f, g, h, i, j, k, l = get_indicator_and_candle_values_from_gene(pool[max_pos], indicators_and_candle_values)
 	print(f'buy trigger: {a} > {b:.5f} * {c} & {d} > {e:.5f} * {f}')
 	print(f'sell trigger: {g} > {h:.5f} * {i} & {j} > {k:.5f} * {l}')
+
+	save_data('bot_record.csv', bot_record)

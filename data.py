@@ -1,6 +1,7 @@
 import ccxt
 import pandas as pd
 from ta import momentum, volume, volatility, trend, others
+import os
 
 StrSeriesPairs = list[tuple[str, pd.Series]]
 
@@ -85,3 +86,10 @@ def list_indicators_and_candle_values(df: pd.DataFrame) -> StrSeriesPairs:
         ('close', df['close']),
         ('volume', df['volume']),
     ]
+
+def save_data(filename: str, bot_record: list):
+    dir_path = os.getcwd() + '/result'
+
+    if not os.path.exists(dir_path):
+        os.makedirs(dir_path)
+    pd.DataFrame(bot_record).to_csv(dir_path + '/' + filename, index=True, index_label='Epoch')
