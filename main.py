@@ -6,7 +6,6 @@ from genetic import POPULATION, Population, rand_trigger, evaluate, selection, c
 MAX_ITER = 30
 
 if __name__=='__main__':
-
 	# Allow printing the entire data frame
 	pd.set_option('display.max_columns', None)
 	pd.set_option('display.max_rows', None)
@@ -27,24 +26,22 @@ if __name__=='__main__':
 		]
 		for _ in range(POPULATION)
 	]
-	next: Population = [[] for _ in range(POPULATION)]
+	next_gen: Population = [[] for _ in range(POPULATION)]
 
 	# Run genetic algorithm for some number of iterations
 	for _ in tqdm(range(MAX_ITER), total=MAX_ITER):
-		
 		max_pos, max_fit, fit_sum, fitnesses = evaluate(df_rows, pool, indicators_and_candle_values)
 		# Preserve best gene and replicate it so it appears twice in the next generation
-		next[0] = pool[max_pos]
-		next[1] = pool[max_pos]
+		next_gen[0] = pool[max_pos]
 		# Do crossover for the rest of genes and mutate a small amount of them randomly
-		for i in range(2, POPULATION - 1, 2):
-			crossover(pool[selection(fit_sum, fitnesses)], pool[selection(fit_sum, fitnesses)], i, next)
-		mutation(next, indicators_and_candle_values)
-		pool = next
+		for i in range(1, POPULATION, 2):
+			crossover(pool[selection(fit_sum, fitnesses)], pool[selection(fit_sum, fitnesses)], i, next_gen)
+		mutation(next_gen, indicators_and_candle_values)
+		pool = next_gen
 
 	# Print out the best gene after all the evolution
 	max_pos, max_fit, fit_sum, fitnesses = evaluate(df_rows, pool, indicators_and_candle_values)
-	print(f'best bot earns ${max_fit}')
+	print(f'best bot earns ${max_fit:.5f}')
 	a, b, c, d, e, f, g, h, i, j, k, l = get_indicator_and_candle_values_from_gene(pool[max_pos], indicators_and_candle_values)
-	print(f'buy trigger: {a} > {b} * {c} & {d} > {e} * {f}')
-	print(f'sell trigger: {g} > {h} * {i} & {j} > {k} * {l}')
+	print(f'buy trigger: {a} > {b:.5f} * {c} & {d} > {e:.5f} * {f}')
+	print(f'sell trigger: {g} > {h:.5f} * {i} & {j} > {k:.5f} * {l}')

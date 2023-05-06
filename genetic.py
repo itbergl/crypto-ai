@@ -3,54 +3,10 @@ import pandas as pd
 import numpy as np
 from data import StrSeriesPairs
 
-POPULATION = 500
+POPULATION = 501 # Has to be an odd number
 Gene = list[int, float, int, int, float, int, int, float, int, int, float, int]
 Population = list[Gene]
 
-
-'''
-Proposal for more general approach:
-
-	Solution is an OR chain [GENE1, GENE2, GENE3, GENE4, ...], where GENEX is 
-	an AND chain of [LIT, LIT, LIT, LIT, ...] and LIT is a function IND > c*IND.
-
-	We could have a max size for Solutions and max size for GENEs. 
-
-	class Solution:
-		--> property) genes: list[GENE]
-	
-	class GENE:
-		--> property) literals: list[Literal]
-	
-	class Literal:
-		--> property) A -> string
-		--> property) B -> string
-		--> properrty) C -> float
-
-		--> function) call(df_row) -> (df_row[A] > c*df_row[B])
-	
-	^ Just ideas they don't have to be classes.
-
-	We could implement a crossover / mutation in each.
-
-	Since there is a fixed size for each solution (max_gene_len * max_literal_len)
-	each could even be represented by an array.
-
-	 (A > b*C)	(D > e*f)	(G > h*I) ...
-	 (J > k*L)	(M > n*O)	(P > q*R) ...
-	 (S > t*U)	(V > w*X)	(Y > z*(AA))
-	 .
-	 .
-	 .
-
-	 Which could be expressed as a string 
-
-	Solution =  [A > b*C OR D > e*f OR G > h*I OR ...] AND [J > k*L OR M > n*O OR P > q*R OR ...] AND [S > t*U OR V > w*X OR Y > z*(AA) OR ...] AND ...
-
-	Evalution could be vectorised on this array (using numpy.vectorize) to be faster than O(n^2)
-
-
-'''
 def rand_trigger(indicators_and_candle_values: StrSeriesPairs):
 	'''
 	Randomly create an expression of `A > c * B` where `A` and `B` are indicator or candle values.
@@ -90,7 +46,7 @@ def rand_indicator_or_candle_val(indicators_and_candle_values: StrSeriesPairs):
 	'''
 	return random.randrange(0, len(indicators_and_candle_values))
 
-def evaluate(df_rows: list, pool: Population, indicators_and_candle_values: StrSeriesPairs):
+def evaluate(df_rows: pd.Series, pool: Population, indicators_and_candle_values: StrSeriesPairs):
 	'''
 	Call the fitness evaluation for each gene in the pool and return the restuls in fitnesses.
 	Add up the total fitness sum of all the genes in the whole generation and find the best one to return.
@@ -128,8 +84,8 @@ def get_indicator_and_candle_values_from_gene(gene: Gene, indicators_and_candle_
 		k,
 		indicators_and_candle_values[l][0],
 	)
-	
-def fitness(df_rows: list, gene: Gene, indicators_and_candle_values: StrSeriesPairs) -> float:
+
+def fitness(df_rows: pd.Series, gene: Gene, indicators_and_candle_values: StrSeriesPairs) -> float:
 	'''
 	Calculate the amount of money at the end of all the trades starting with $100.
 	'''
@@ -160,7 +116,7 @@ def selection(fit_sum: float, fitnesses: list[float]):
 		count += fitnesses[i]
 	return i
 
-def crossover(g1: Gene, g2: Gene, pos: int, next: Population):
+def crossover(g1: Gene, g2: Gene, pos: int, next_gen: Population):
 	'''
 	Given `2` genes `g1` and `g2` which were selected through the selection process.
 	Randomly pick a cut out of the `4` expressions.
@@ -168,8 +124,8 @@ def crossover(g1: Gene, g2: Gene, pos: int, next: Population):
 	These two new genes will enter the next generation of the process.
  	'''
 	cut = random.choice((3, 6, 9))
-	next[pos] = [*[g1[i] for i in range(cut)], *[g2[i] for i in range(cut, len(g1))]]
-	next[pos + 1] = [*[g2[i] for i in range(cut)], *[g1[i] for i in range(cut, len(g1))]]
+	next_gen[pos] = [*[g1[i] for i in range(cut)], *[g2[i] for i in range(cut, len(g1))]]
+	next_gen[pos + 1] = [*[g2[i] for i in range(cut)], *[g1[i] for i in range(cut, len(g1))]]
 
 def mutation(pool: Population, indicators_and_candle_values: StrSeriesPairs):
 	'''
