@@ -10,6 +10,15 @@ def retrieve_data():
     ohlc = exchange.fetch_ohlcv(symbol='BTC/AUD', timeframe='1d')
     df = pd.DataFrame(ohlc, columns=['timestamp', 'open', 'high', 'low', 'close', 'volume'])
     df['timestamp'] = pd.to_datetime(df['timestamp'], unit='ms')
+    df.set_index('timestamp', inplace=True)
+
+    first_non_nan = df.loc[~df.isnull().sum(1).astype(bool)].iloc[0]
+    
+    # divide all values by the first non-nan value to normalise
+    # TODO: do this per column as technically this is looking ahead
+    # for some columns that aren't NaN itially
+    df = df / first_non_nan
+
     return df
 
 def add_all_indicators(df: pd.DataFrame, indicators_and_candle_values: StrSeriesPairs):
