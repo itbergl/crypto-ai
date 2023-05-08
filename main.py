@@ -14,6 +14,7 @@ if __name__=='__main__':
 	df = retrieve_data()
 	indicators_and_candle_values = list_indicators_and_candle_values(df)
 	df = add_all_indicators(df, indicators_and_candle_values)
+	df.to_csv('data.csv', index=False)
 	df_rows = [row for _, row in df.iterrows()]
 
 	# Initialise gene pools

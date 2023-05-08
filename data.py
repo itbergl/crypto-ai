@@ -12,18 +12,18 @@ def retrieve_data():
     df['timestamp'] = pd.to_datetime(df['timestamp'], unit='ms')
     df.set_index('timestamp', inplace=True)
 
-    first_non_nan = df.loc[~df.isnull().sum(1).astype(bool)].iloc[0]
-    
-    # divide all values by the first non-nan value to normalise
-    # TODO: do this per column as technically this is looking ahead
-    # for some columns that aren't NaN itially
-    df = df / first_non_nan
-
     return df
 
 def add_all_indicators(df: pd.DataFrame, indicators_and_candle_values: StrSeriesPairs):
-    for key, value in indicators_and_candle_values[:-5]:
-        df[key] = value
+    for col, value in indicators_and_candle_values[:-5]:
+        # normalize by the first non-nan value
+        df[col] = value
+
+    # normalize by the first non-nan value
+    for col in df.columns:
+        first_value = df[col].loc[~df[col].isnull()].iloc[0]
+        df[col] /= first_value
+        
     return df
 
 def list_indicators_and_candle_values(df: pd.DataFrame) -> StrSeriesPairs:
