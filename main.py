@@ -1,7 +1,7 @@
 import pandas as pd
 from tqdm import tqdm
 from data import retrieve_data, list_indicators_and_candle_values, add_all_indicators, save_data
-from genetic import POPULATION, Population, rand_trigger, evaluate, selection, crossover, mutation, get_indicator_and_candle_values_from_gene
+from genetic import POPULATION, Population, format_trigger, get_expression, rand_trigger, evaluate, selection, crossover, mutation, get_indicator_and_candle_values_from_gene
 
 MAX_ITER = 30
 
@@ -19,16 +19,14 @@ if __name__=='__main__':
 	# Initialise gene pools
 	pool: Population = [
 		[
-			*rand_trigger(indicators_and_candle_values),
-			*rand_trigger(indicators_and_candle_values),
-			*rand_trigger(indicators_and_candle_values),
-			*rand_trigger(indicators_and_candle_values),
+			rand_trigger(indicators_and_candle_values), # buy trigger
+			rand_trigger(indicators_and_candle_values), # sell trigger
 		]
 		for _ in range(POPULATION)
 	]
 	next_gen: Population = [[] for _ in range(POPULATION)]
 
-	# record bot values for visualisation
+	# Record bot values for visualisation
 	bot_record = []
 
 	# Run genetic algorithm for some number of iterations
@@ -39,19 +37,20 @@ if __name__=='__main__':
 		item = {'max_pos': max_pos, 'max_fit': max_fit, 'fit_sum': fit_sum, 'fitnesses': fitnesses}
 		bot_record.append(item)
 
-		# Preserve best gene and replicate it so it appears twice in the next generation
+		# Preserve the best gene for in the next generation
 		next_gen[0] = pool[max_pos]
-		# Do crossover for the rest of genes and mutate a small amount of them randomly
+		# Do crossover for the rest of genes
 		for i in range(1, POPULATION, 2):
 			crossover(pool[selection(fit_sum, fitnesses)], pool[selection(fit_sum, fitnesses)], i, next_gen)
+		# Mutate a small percentage of the population randomly
 		mutation(next_gen, indicators_and_candle_values)
 		pool = next_gen
 
 	# Print out the best gene after all the evolution
 	max_pos, max_fit, fit_sum, fitnesses = evaluate(df_rows, pool, indicators_and_candle_values)
 	print(f'best bot earns ${max_fit:.5f}')
-	a, b, c, d, e, f, g, h, i, j, k, l = get_indicator_and_candle_values_from_gene(pool[max_pos], indicators_and_candle_values)
-	print(f'buy trigger: {a} > {b:.5f} * {c} & {d} > {e:.5f} * {f}')
-	print(f'sell trigger: {g} > {h:.5f} * {i} & {j} > {k:.5f} * {l}')
+	expressions = [get_expression(expression, indicators_and_candle_values) for expression in get_indicator_and_candle_values_from_gene(pool[max_pos])]
+	print(f'buy trigger: {format_trigger(expressions[:4])}')
+	print(f'sell trigger: {format_trigger(expressions[4:])}')
 
 	save_data('bot_record.csv', bot_record)

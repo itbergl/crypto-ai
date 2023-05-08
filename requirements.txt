@@ -6,4 +6,5 @@ optuna
 tqdm
 matplotlib
 seaborn
+scipy
 empiricaldist
