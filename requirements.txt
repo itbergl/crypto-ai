@@ -3,6 +3,7 @@ ta
 pandas
 numpy
 optuna
+optuna-dashboard
 tqdm
 matplotlib
 seaborn

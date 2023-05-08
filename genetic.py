@@ -4,8 +4,6 @@ from data import StrSeriesPairs
 import pandas as pd
 from tqdm import tqdm
 
-POPULATION = 501 # Has to be an odd number
-MUTATION_PERCENT = 0.01 # The percentage of the population to mutate
 
 # Language to express candidate solutions which are defined by Gene, a subset of the dnf
 Literal = tuple[int, float, int]
@@ -15,29 +13,26 @@ Gene = tuple[Disjunctive, Disjunctive]
 Population = list[Gene]
 Expression = list[str, float, str]
 
-def rand_trigger(indicators_and_candle_values: StrSeriesPairs) -> Disjunctive:
+def rand_trigger(indicators_and_candle_values: StrSeriesPairs, init_std = 1) -> Disjunctive:
     return [
 		[
-			rand_expression(indicators_and_candle_values),
-			rand_expression(indicators_and_candle_values),
+			rand_expression(indicators_and_candle_values, init_std),
+			rand_expression(indicators_and_candle_values, init_std),
 		],
 		[
-			rand_expression(indicators_and_candle_values),
-			rand_expression(indicators_and_candle_values),
+			rand_expression(indicators_and_candle_values, init_std),
+			rand_expression(indicators_and_candle_values, init_std),
 		],
 	]
 
-def rand_expression(indicators_and_candle_values: StrSeriesPairs) -> Literal:
+def rand_expression(indicators_and_candle_values: StrSeriesPairs, init_std) -> Literal:
 	'''
 	Randomly create an expression of `A > c * B` where `A` and `B` are indicator or candle values.
 	'''
 	lhs, rhs = random.sample(range(len(indicators_and_candle_values)), 2)
-	c = rand_constant() # TODO: put kwarg here
+	c = np.random.normal(0, init_std, 1)[0]
 
 	return [lhs, c, rhs]
-
-def rand_constant(std=1) -> float:
-	return np.random.normal(0, std, 1)[0]
 
 
 def evaluate(df_rows: pd.Series, pool: Population, indicators_and_candle_values: StrSeriesPairs):
@@ -102,15 +97,10 @@ def selection(fit_sum: float, fitnesses: list[float]):
 	Wheel segments are covered with gene symbols, where the segment size matches the relative fitness level (twice the fitness means twice the area).
 	Assuming each spin is random, it will select a random gene with the desired bias according to their fitness levels.
 	'''
-	wheel = random.randrange(0, round(fit_sum))
-	i = 0
-	count = fitnesses[0]
-	while count < wheel:
-		i += 1
-		count += fitnesses[i]
-	return i
+	return np.random.choice(range(len(fitnesses)), p=[fitness/fit_sum for fitness in fitnesses])
 
-def crossover(g1: Gene, g2: Gene, pos: int, next_gen: Population):
+
+def crossover(a: int, b: int, pool: Population):
 	'''
 	Given `2` genes `g1` and `g2` which were selected through the selection process.
 	Randomly pick a cut out of the `4` expressions.
@@ -119,24 +109,32 @@ def crossover(g1: Gene, g2: Gene, pos: int, next_gen: Population):
 	`buy_trigger = A and B or C and D`,
 	`sell_trigger = E and F or G and H`,
  	'''
+	g1, g2 = pool[a], pool[b]
 	expressions1 = get_indicator_and_candle_values_from_gene(g1)
 	expressions2 = get_indicator_and_candle_values_from_gene(g2)
 	cut = random.choice(range(1, 7))
 	A, B, C, D, E, F, G, H = expressions1[:cut] + expressions2[cut:]
 	I, J, K, L, M, N, O, P = expressions2[:cut] + expressions1[cut:]
 
-	next_gen[pos] = [[[A, B], [C, D]], [[E, F], [G, H]]]
-	next_gen[pos + 1] = [[[I, J], [K, L]], [[M, N], [O, P]]]
+	cross_g1 = [[[A, B], [C, D]], [[E, F], [G, H]]]
+	cross_g2 = [[[I, J], [K, L]], [[M, N], [O, P]]]
 
-def mutation(pool: Population, indicators_and_candle_values: StrSeriesPairs):
+	return cross_g1, cross_g2
+
+def mutation(pool: Population, n_mutations = 5, mutation_std = 1):
 	'''
 	Randomly change the constant value in one of the 8 expressions in a small percentage of the genes picked randomly from the population.
  	'''
-	for _ in range(round(POPULATION * MUTATION_PERCENT)):
-		i = random.randrange(0, POPULATION)
+	# NOTE: this for some reason is decreasing our max_fitness
+	for _ in range(n_mutations):
+		# for any non-maximal gene
+		i = random.randrange(1, len(pool))
 		a,b,c = [random.choice([0,1]) for _ in range(3)]
 		expression = pool[i][a][b][c]
-		expression[1] = rand_constant()
+
+		# NOTE: both of these don't work
+		# expression[1] = np.random.normal(0, mutation_std, 1)[0]
+		expression[1] = np.random.normal(expression[1], mutation_std, 1)[0]
 
 def format_trigger(expressions: list[Expression]):
 	format_exp = lambda exp: f'{exp[0]} > {exp[1]:.5f} * {exp[2]}'
