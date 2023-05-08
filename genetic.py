@@ -68,6 +68,11 @@ def get_expression(expression: Literal, indicators_and_candle_values: StrSeriesP
 	return indicators_and_candle_values[a][0], b, indicators_and_candle_values[c][0]
 
 def evaluate_expressions(row, expressions: list[Expression]):
+	'''
+	Evaluate the expressions of `A > c * B` where `A` and `B` are indicator or candle values.
+
+	nans should return False.
+	'''
 	return all(map(lambda exp: row[exp[0]] > exp[1]*row[exp[2]], expressions))
 
 
@@ -97,6 +102,7 @@ def selection(fit_sum: float, fitnesses: list[float]):
 	Wheel segments are covered with gene symbols, where the segment size matches the relative fitness level (twice the fitness means twice the area).
 	Assuming each spin is random, it will select a random gene with the desired bias according to their fitness levels.
 	'''
+	# use weighted probabily to select a gene (roulette wheel)
 	return np.random.choice(range(len(fitnesses)), p=[fitness/fit_sum for fitness in fitnesses])
 
 

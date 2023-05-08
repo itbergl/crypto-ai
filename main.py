@@ -4,13 +4,13 @@ from data import retrieve_data, list_indicators_and_candle_values, add_all_indic
 from genetic import Population, format_trigger, get_expression, rand_trigger, evaluate, selection, crossover, mutation, get_indicator_and_candle_values_from_gene
 import random
 import optuna
-import numpy as np 
 
 MAX_ITER = 30
 POPULATION = 501
 
 USE_OPTUNA = False
 
+# Used when not using OPTUNA
 DEFAULT_PARAMS = {
 	'INIT_STD': 1,		# The standard deviation of the normal distribution used to initialise
 	'MUTATION_STD': 1,	# The standard deviation of the normal distribution used to mutate
@@ -18,6 +18,7 @@ DEFAULT_PARAMS = {
 	'N_CROSSOVER': 500, # The number of crossovers 
 }
 
+# Defines the searchspace for OPTUNA
 OPTUNA_SEARCHSPACE = {
 	'INIT_STD': [_ for _ in range(1, 5)],
 	'MUTATION_STD': [_ for _ in range(1, 5)],
@@ -28,11 +29,12 @@ OPTUNA_SEARCHSPACE = {
 # random.seed(100)
 # np.random.seed(100)
 
-def run(df_rows, indicators_and_candle_values, trial=None):
-	# Initialise gene pools
-
+def run(df_rows: list, indicators_and_candle_values, trial: optuna.trial=None):
+	
+	# select parameters
 	params = DEFAULT_PARAMS if trial is None else {k: trial.suggest_int(k, OPTUNA_SEARCHSPACE[k][0], OPTUNA_SEARCHSPACE[k][-1]) for k in OPTUNA_SEARCHSPACE}
 
+	# Initialise gene pools
 	pool: Population = [
 		[
 			rand_trigger(indicators_and_candle_values, params['INIT_STD']), # buy trigger
@@ -97,6 +99,7 @@ if __name__=='__main__':
 	df.to_csv('data.csv', index=False)
 	df_rows = [row for _, row in df.iterrows()]
 
+	# Run the genetic algorithm with default values 
 	if not USE_OPTUNA:
 		(max_pos, max_fit, fit_sum, fitnesses), bot_record, pool = run(df_rows, indicators_and_candle_values)
 		print(f'best bot earns ${max_fit:.5f}')
@@ -105,8 +108,9 @@ if __name__=='__main__':
 		print(f'sell trigger: {format_trigger(expressions[4:])}')
 
 		save_data('bot_record.csv', bot_record)
-	else:
 
+	# do a hyperparameter search with OPTUNA
+	else:
 		study = optuna.create_study(direction="maximize", 
 							sampler = optuna.samplers.GridSampler(search_space=OPTUNA_SEARCHSPACE), 
 							pruner = optuna.pruners.MedianPruner(),

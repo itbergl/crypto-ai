@@ -16,14 +16,13 @@ def retrieve_data():
 
 def add_all_indicators(df: pd.DataFrame, indicators_and_candle_values: StrSeriesPairs):
     for col, value in indicators_and_candle_values[:-5]:
-        # normalize by the first non-nan value
         df[col] = value
 
     # normalize by the first non-nan value
     for col in df.columns:
         first_value = df[col].loc[~df[col].isnull()].iloc[0]
         df[col] /= first_value
-        
+
     return df
 
 def list_indicators_and_candle_values(df: pd.DataFrame) -> StrSeriesPairs:
