@@ -1,7 +1,8 @@
 import random
-import pandas as pd
 import numpy as np
 from data import StrSeriesPairs
+import pandas as pd
+from tqdm import tqdm
 
 POPULATION = 501 # Has to be an odd number
 MUTATION_PERCENT = 0.01 # The percentage of the population to mutate
@@ -12,7 +13,7 @@ Conjunctive = tuple[Literal, Literal]
 Disjunctive = tuple[Conjunctive, Conjunctive]
 Gene = tuple[Disjunctive, Disjunctive]
 Population = list[Gene]
-Expression = tuple[str, float, str]
+Expression = list[str, float, str]
 
 def rand_trigger(indicators_and_candle_values: StrSeriesPairs) -> Disjunctive:
     return [
@@ -30,57 +31,25 @@ def rand_expression(indicators_and_candle_values: StrSeriesPairs) -> Literal:
 	'''
 	Randomly create an expression of `A > c * B` where `A` and `B` are indicator or candle values.
 	'''
-	lhs = rand_indicator_or_candle_val(indicators_and_candle_values)
-	rhs = rand_indicator_or_candle_val(indicators_and_candle_values)
-	while lhs == rhs:
-		rhs = rand_indicator_or_candle_val(indicators_and_candle_values)
-	c = rand_constant(lhs, rhs, indicators_and_candle_values)
+	lhs, rhs = random.sample(range(len(indicators_and_candle_values)), 2)
+	c = rand_constant() # TODO: put kwarg here
+
 	return [lhs, c, rhs]
 
-def rand_constant(lhs: int, rhs: int, indicators_and_candle_values: StrSeriesPairs) -> float:
-	'''
-	Randomly create a constant in the range of `- A / B` to `A / B`.
-	Calculate this range using the median value of `A` and `B`.
-	'''
-	values1 = indicators_and_candle_values[lhs][1]
-	values2 = indicators_and_candle_values[rhs][1]
-	# TODO change how to pick the constant value
-	val1 = find_median(values1[len(values1) // 2], values1)
-	val2 = find_median(values2[len(values2) // 2], values2)
-	return 0 if val2 == 0 else (random.random() - 0.5) * (val1 // val2)
+def rand_constant(std=1) -> float:
+	return np.random.normal(0, std, 1)[0]
 
-def find_median(value, values):
-	'''
-	If the value is `0` or `NAN` find another value that is not, otherwise return `0`.
-	'''
-	if value != 0 and not np.isnan(value):
-		return value
-	for val in values:
-		if val != 0 and not np.isnan(val):
-			return val
-	return 0
-
-def rand_indicator_or_candle_val(indicators_and_candle_values: StrSeriesPairs):
-	'''
-	Randomly pick an indicator or candle value and return its index.
-	'''
-	return random.randrange(0, len(indicators_and_candle_values))
 
 def evaluate(df_rows: pd.Series, pool: Population, indicators_and_candle_values: StrSeriesPairs):
 	'''
 	Call the fitness evaluation for each gene in the pool and return the restuls in fitnesses.
 	Add up the total fitness sum of all the genes in the whole generation and find the best one to return.
 	'''
-	max_pos = 0
-	max_fit = 0.
-	fit_sum = 0.
-	fitnesses = [0. for _ in range(POPULATION)]
-	for i in range(POPULATION):
-		fitnesses[i] = fitness(df_rows, pool[i], indicators_and_candle_values)
-		fit_sum += fitnesses[i]
-		if fitnesses[i] > max_fit:
-			max_fit = fitnesses[i]
-			max_pos = i
+	fitnesses = [fitness(df_rows, gene, indicators_and_candle_values) for gene in pool]
+	fit_sum = sum(fitnesses)
+	max_pos = np.argmax(fitnesses)
+	max_fit = fitnesses[max_pos]
+	
 	return max_pos, max_fit, fit_sum, fitnesses
 
 def get_indicator_and_candle_values_from_gene(gene: Gene) -> list[Literal]:
@@ -104,12 +73,11 @@ def get_expression(expression: Literal, indicators_and_candle_values: StrSeriesP
 	return indicators_and_candle_values[a][0], b, indicators_and_candle_values[c][0]
 
 def evaluate_expressions(row, expressions: list[Expression]):
-	A, B, C, D = expressions
-	return evaluate_expression(row, A) and evaluate_expression(row, B) or evaluate_expression(row, C) and evaluate_expression(row, D)
+	if any(map(np.isnan, [row[e[i]] for e in expressions for i in [0,2]])):
+		return False
+	
+	return all(map(lambda exp: row[exp[0]] > exp[1]*row[exp[2]], expressions))
 
-def evaluate_expression(row, expression: Expression):
-	a, b, c = expression
-	return row[a] > b * row[c]
 
 def fitness(df_rows: pd.Series, gene: Gene, indicators_and_candle_values: StrSeriesPairs) -> float:
 	'''
@@ -118,14 +86,17 @@ def fitness(df_rows: pd.Series, gene: Gene, indicators_and_candle_values: StrSer
 	amount = 100.
 	buy_trigger = False
 	expressions = [get_expression(expression, indicators_and_candle_values) for expression in get_indicator_and_candle_values_from_gene(gene)]
+	buy_triggers, sell_triggers = expressions[:4], expressions[4:]
 	for row in df_rows:
-		if not buy_trigger and all(not (np.isnan(row[indicator1]) or np.isnan(row[indicator2])) for (indicator1, indicator2) in [(expression[0], expression[2]) for expression in expressions[:4]]) and evaluate_expressions(row, expressions[:4]):
-			amount -= amount * 0.02
-			amount /= row['close']
-			buy_trigger = True
-		elif buy_trigger and all(not (np.isnan(row[indicator1]) or np.isnan(row[indicator2])) for (indicator1, indicator2) in [(expression[0], expression[2]) for expression in expressions[4:]]) and evaluate_expressions(row, expressions[4:]):
-			amount *= row['close'] * (1 - 0.02)
-			buy_trigger = False
+		if not buy_trigger:
+			if evaluate_expressions(row, buy_triggers):
+				amount -= amount * 0.02
+				amount /= row['close']
+				buy_trigger = True
+		elif buy_trigger:
+			if evaluate_expressions(row, sell_triggers):
+				amount *= row['close'] * (1 - 0.02)
+				buy_trigger = False
 	return amount
 
 def selection(fit_sum: float, fitnesses: list[float]):
@@ -166,28 +137,11 @@ def mutation(pool: Population, indicators_and_candle_values: StrSeriesPairs):
  	'''
 	for _ in range(round(POPULATION * MUTATION_PERCENT)):
 		i = random.randrange(0, POPULATION)
-		match random.choice(range(8)):
-			case 0:
-				expression = pool[i][0][0][0]
-			case 1:
-				expression = pool[i][0][0][1]
-			case 2:
-				expression = pool[i][0][1][0]
-			case 3:
-				expression = pool[i][0][1][1]
-			case 4:
-				expression = pool[i][1][0][0]
-			case 5:
-				expression = pool[i][1][0][1]
-			case 6:
-				expression = pool[i][1][1][0]
-			case 7:
-				expression = pool[i][1][1][1]
-		expression[1] = rand_constant(expression[0], expression[2], indicators_and_candle_values)
+		a,b,c = [random.choice([0,1]) for _ in range(3)]
+		expression = pool[i][a][b][c]
+		expression[1] = rand_constant()
 
 def format_trigger(expressions: list[Expression]):
-	return f'{format_expression(expressions[0])} & {format_expression(expressions[1])} or {format_expression(expressions[2])} & {format_expression(expressions[3])}'
-
-def format_expression(expression: Expression):
-	a, b, c = expression
-	return f'{a} > {b:.5f} * {c}'
+	format_exp = lambda a,b,c: f'{a} > {b:.5f} * {c}'
+	formatted = tuple(map(format_exp, exp) for exp in expressions)
+	return '( {} & {} ) || ( {} & {} )'.format(*formatted)
