@@ -73,9 +73,6 @@ def get_expression(expression: Literal, indicators_and_candle_values: StrSeriesP
 	return indicators_and_candle_values[a][0], b, indicators_and_candle_values[c][0]
 
 def evaluate_expressions(row, expressions: list[Expression]):
-	if any(map(np.isnan, [row[e[i]] for e in expressions for i in [0,2]])):
-		return False
-	
 	return all(map(lambda exp: row[exp[0]] > exp[1]*row[exp[2]], expressions))
 
 
@@ -142,6 +139,6 @@ def mutation(pool: Population, indicators_and_candle_values: StrSeriesPairs):
 		expression[1] = rand_constant()
 
 def format_trigger(expressions: list[Expression]):
-	format_exp = lambda a,b,c: f'{a} > {b:.5f} * {c}'
-	formatted = tuple(map(format_exp, exp) for exp in expressions)
+	format_exp = lambda exp: f'{exp[0]} > {exp[1]:.5f} * {exp[2]}'
+	formatted = list(map(format_exp, [exp for exp in expressions]))
 	return '( {} & {} ) || ( {} & {} )'.format(*formatted)
