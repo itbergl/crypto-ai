@@ -2,8 +2,7 @@ import random
 import numpy as np
 from data import StrSeriesPairs
 import pandas as pd
-from tqdm import tqdm
-
+import copy
 
 # Language to express candidate solutions which are defined by Gene, a subset of the dnf
 Literal = tuple[int, float, int]
@@ -13,24 +12,24 @@ Gene = tuple[Disjunctive, Disjunctive]
 Population = list[Gene]
 Expression = list[str, float, str]
 
-def rand_trigger(indicators_and_candle_values: StrSeriesPairs, init_std = 1) -> Disjunctive:
+def rand_trigger(indicators_and_candle_values: StrSeriesPairs) -> Disjunctive:
     return [
 		[
-			rand_expression(indicators_and_candle_values, init_std),
-			rand_expression(indicators_and_candle_values, init_std),
+			rand_expression(indicators_and_candle_values),
+			rand_expression(indicators_and_candle_values),
 		],
 		[
-			rand_expression(indicators_and_candle_values, init_std),
-			rand_expression(indicators_and_candle_values, init_std),
+			rand_expression(indicators_and_candle_values),
+			rand_expression(indicators_and_candle_values),
 		],
 	]
 
-def rand_expression(indicators_and_candle_values: StrSeriesPairs, init_std) -> Literal:
+def rand_expression(indicators_and_candle_values: StrSeriesPairs) -> Literal:
 	'''
 	Randomly create an expression of `A > c * B` where `A` and `B` are indicator or candle values.
 	'''
 	lhs, rhs = random.sample(range(len(indicators_and_candle_values)), 2)
-	c = np.random.normal(0, init_std, 1)[0]
+	c = np.random.normal(0, 1, 1)[0]
 
 	return [lhs, c, rhs]
 
@@ -94,6 +93,10 @@ def fitness(df_rows: pd.Series, gene: Gene, indicators_and_candle_values: StrSer
 			if evaluate_expressions(row, sell_triggers):
 				amount *= row['close'] * (1 - 0.02)
 				buy_trigger = False
+	# force sell at the end
+	if buy_trigger:
+		amount *= row['close'] * (1 - 0.02)
+
 	return amount
 
 def selection(fit_sum: float, fitnesses: list[float]):
@@ -122,8 +125,8 @@ def crossover(a: int, b: int, pool: Population):
 	A, B, C, D, E, F, G, H = expressions1[:cut] + expressions2[cut:]
 	I, J, K, L, M, N, O, P = expressions2[:cut] + expressions1[cut:]
 
-	cross_g1 = [[[A, B], [C, D]], [[E, F], [G, H]]]
-	cross_g2 = [[[I, J], [K, L]], [[M, N], [O, P]]]
+	cross_g1 =  copy.deepcopy([ [[A, B], [C, D]], [[E, F], [G, H]] ])
+	cross_g2 = copy.deepcopy([ [[I, J], [K, L]], [[M, N], [O, P]] ])
 
 	return cross_g1, cross_g2
 
@@ -138,8 +141,6 @@ def mutation(pool: Population, n_mutations = 5, mutation_std = 1):
 		a,b,c = [random.choice([0,1]) for _ in range(3)]
 		expression = pool[i][a][b][c]
 
-		# NOTE: both of these don't work
-		# expression[1] = np.random.normal(0, mutation_std, 1)[0]
 		expression[1] = np.random.normal(expression[1], mutation_std, 1)[0]
 
 def format_trigger(expressions: list[Expression]):

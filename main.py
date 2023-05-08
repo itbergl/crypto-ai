@@ -4,15 +4,24 @@ from data import retrieve_data, list_indicators_and_candle_values, add_all_indic
 from genetic import Population, format_trigger, get_expression, rand_trigger, evaluate, selection, crossover, mutation, get_indicator_and_candle_values_from_gene
 import random
 import optuna
+import copy
+import numpy as np
 
+# Constants
 MAX_ITER = 30
-POPULATION = 501
+POPULATION = 500 + 1
 
-USE_OPTUNA = False
+# SEED
+# seeding to ensure same initial conditions
+SEED = random.randint(0, 100000)
+def reset_seed():
+	random.seed(SEED)
+	np.random.seed(SEED)
+
+USE_OPTUNA = True
 
 # Used when not using OPTUNA
 DEFAULT_PARAMS = {
-	'INIT_STD': 1,		# The standard deviation of the normal distribution used to initialise
 	'MUTATION_STD': 1,	# The standard deviation of the normal distribution used to mutate
 	'N_MUTATIONS': 5, # The number of genes to mutate
 	'N_CROSSOVER': 500, # The number of crossovers 
@@ -20,51 +29,47 @@ DEFAULT_PARAMS = {
 
 # Defines the searchspace for OPTUNA
 OPTUNA_SEARCHSPACE = {
-	'INIT_STD': [_ for _ in range(1, 5)],
-	'MUTATION_STD': [_ for _ in range(1, 5)],
-	'N_MUTATIONS': [_ for _ in range(1, 20, 2)],
+	'MUTATION_STD': [_ for _ in range(1, 6)],
+	'N_MUTATIONS': [_ for _ in range(5, 20, 5)],
 	'N_CROSSOVER': [_ for _ in range(100, POPULATION, 100)],
 }
 
-# random.seed(100)
-# np.random.seed(100)
 
 def run(df_rows: list, indicators_and_candle_values, trial: optuna.trial=None):
-	
+	reset_seed()
 	# select parameters
 	params = DEFAULT_PARAMS if trial is None else {k: trial.suggest_int(k, OPTUNA_SEARCHSPACE[k][0], OPTUNA_SEARCHSPACE[k][-1]) for k in OPTUNA_SEARCHSPACE}
 
 	# Initialise gene pools
 	pool: Population = [
 		[
-			rand_trigger(indicators_and_candle_values, params['INIT_STD']), # buy trigger
-			rand_trigger(indicators_and_candle_values, params['INIT_STD']), # sell trigger
+			rand_trigger(indicators_and_candle_values), # buy trigger
+			rand_trigger(indicators_and_candle_values), # sell trigger
 		]
 		for _ in range(POPULATION)
 	]
+
 	next_gen: Population = [[] for _ in range(POPULATION)]
 
 	# Record bot values for visualisation
 	bot_record = []
-
 	# Run genetic algorithm for some number of iterations
 	epochs = range(MAX_ITER) if trial is not None else tqdm(range(MAX_ITER), total=MAX_ITER)
 	for epoch in epochs:
 		# Shuffle the pool to avoid bias
+		A = pool[0]
 		random.shuffle(pool)
 		max_pos, max_fit, fit_sum, fitnesses = evaluate(df_rows, pool, indicators_and_candle_values)
 
 		# report to optuna
 		if trial is not None:
 			trial.report(max_fit, epoch)
-			if trial.should_prune():
-				raise optuna.exceptions.TrialPruned()
 
 		# append the value record of the best bot
 		bot_record.append({'max_pos': max_pos, 'max_fit': max_fit, 'fit_sum': fit_sum, 'fitnesses': fitnesses})
 
-		# Preserve the best gene for the next generation
-		next_gen[0] = pool[max_pos]
+		# Preserve the best gene for the next generation	
+		next_gen[0] = copy.deepcopy(pool[max_pos])
 		
 		# Do crossover for the rest of genes
 		for i in range(1, len(pool), 2):
@@ -111,11 +116,12 @@ if __name__=='__main__':
 
 	# do a hyperparameter search with OPTUNA
 	else:
+		
 		study = optuna.create_study(direction="maximize", 
 							sampler = optuna.samplers.GridSampler(search_space=OPTUNA_SEARCHSPACE), 
 							pruner = optuna.pruners.MedianPruner(),
 							storage = f'sqlite:///optuna.db',
-							# study_name = 'mango2',
+							study_name = f'seed_{SEED:05}',
 							)
 		study.optimize(lambda trial: run(df_rows, indicators_and_candle_values, trial=trial))
 
