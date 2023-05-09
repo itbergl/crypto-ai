@@ -9,7 +9,7 @@ import numpy as np
 
 # Constants
 MAX_ITER = 30
-POPULATION = 500 + 1
+POPULATION = 501
 
 # SEED
 # seeding to ensure same initial conditions
@@ -24,7 +24,7 @@ USE_OPTUNA = True
 DEFAULT_PARAMS = {
 	'MUTATION_STD': 1,	# The standard deviation of the normal distribution used to mutate
 	'N_MUTATIONS': 5, # The number of genes to mutate
-	'N_CROSSOVER': 500, # The number of crossovers 
+	'N_CROSSOVER': 500, # The number of crossovers
 }
 
 # Defines the searchspace for OPTUNA
@@ -68,17 +68,13 @@ def run(df_rows: list, indicators_and_candle_values, trial: optuna.trial=None):
 		# append the value record of the best bot
 		bot_record.append({'max_pos': max_pos, 'max_fit': max_fit, 'fit_sum': fit_sum, 'fitnesses': fitnesses})
 
-		# Preserve the best gene for the next generation	
+		# Preserve the best gene for the next generation
 		next_gen[0] = copy.deepcopy(pool[max_pos])
-		
+
 		# Do crossover for the rest of genes
-		for i in range(1, len(pool), 2):
+		for i in range(1, params['N_CROSSOVER'], 2):
 			g1, g2 = [selection(fit_sum, fitnesses) for _ in range(2)]
-			cross_g1, cross_g2 = crossover(g1, g2, pool)
-			next_gen[i], next_gen[i+1] = cross_g1, cross_g2
-		
-		# Only use the crossovers for N_CROSSOVER genes
-		next_gen[1:-params['N_CROSSOVER']] = pool[1:-params['N_CROSSOVER']]
+			next_gen[i], next_gen[i + 1] = crossover(pool[g1], pool[g2])
 
 		# Mutate a small number of the population randomly
 		mutation(next_gen, n_mutations = params['N_MUTATIONS'], mutation_std = params['MUTATION_STD'])
@@ -104,7 +100,7 @@ if __name__=='__main__':
 	df.to_csv('data.csv', index=False)
 	df_rows = [row for _, row in df.iterrows()]
 
-	# Run the genetic algorithm with default values 
+	# Run the genetic algorithm with default values
 	if not USE_OPTUNA:
 		(max_pos, max_fit, fit_sum, fitnesses), bot_record, pool = run(df_rows, indicators_and_candle_values)
 		print(f'best bot earns ${max_fit:.5f}')
@@ -116,14 +112,10 @@ if __name__=='__main__':
 
 	# do a hyperparameter search with OPTUNA
 	else:
-		
-		study = optuna.create_study(direction="maximize", 
-							sampler = optuna.samplers.GridSampler(search_space=OPTUNA_SEARCHSPACE), 
-							pruner = optuna.pruners.MedianPruner(),
-							storage = f'sqlite:///optuna.db',
-							study_name = f'seed_{SEED:05}',
-							)
+		study = optuna.create_study(direction="maximize",
+									sampler = optuna.samplers.GridSampler(search_space=OPTUNA_SEARCHSPACE),
+									pruner = optuna.pruners.MedianPruner(),
+									storage = f'sqlite:///optuna.db',
+									study_name = f'seed_{SEED:05}',
+								   )
 		study.optimize(lambda trial: run(df_rows, indicators_and_candle_values, trial=trial))
-
-
-

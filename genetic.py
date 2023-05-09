@@ -5,12 +5,12 @@ import pandas as pd
 import copy
 
 # Language to express candidate solutions which are defined by Gene, a subset of the dnf
+Expression = tuple[str, float, str]
 Literal = tuple[int, float, int]
 Conjunctive = tuple[Literal, Literal]
 Disjunctive = tuple[Conjunctive, Conjunctive]
 Gene = tuple[Disjunctive, Disjunctive]
 Population = list[Gene]
-Expression = list[str, float, str]
 
 def rand_trigger(indicators_and_candle_values: StrSeriesPairs) -> Disjunctive:
     return [
@@ -43,7 +43,6 @@ def evaluate(df_rows: pd.Series, pool: Population, indicators_and_candle_values:
 	fit_sum = sum(fitnesses)
 	max_pos = np.argmax(fitnesses)
 	max_fit = fitnesses[max_pos]
-	
 	return max_pos, max_fit, fit_sum, fitnesses
 
 def get_indicator_and_candle_values_from_gene(gene: Gene) -> list[Literal]:
@@ -74,7 +73,6 @@ def evaluate_expressions(row, expressions: list[Expression]):
 	'''
 	return all(map(lambda exp: row[exp[0]] > exp[1]*row[exp[2]], expressions))
 
-
 def fitness(df_rows: pd.Series, gene: Gene, indicators_and_candle_values: StrSeriesPairs) -> float:
 	'''
 	Calculate the amount of money at the end of all the trades starting with $100.
@@ -89,7 +87,7 @@ def fitness(df_rows: pd.Series, gene: Gene, indicators_and_candle_values: StrSer
 				amount -= amount * 0.02
 				amount /= row['close']
 				buy_trigger = True
-		elif buy_trigger:
+		else:
 			if evaluate_expressions(row, sell_triggers):
 				amount *= row['close'] * (1 - 0.02)
 				buy_trigger = False
@@ -105,11 +103,10 @@ def selection(fit_sum: float, fitnesses: list[float]):
 	Wheel segments are covered with gene symbols, where the segment size matches the relative fitness level (twice the fitness means twice the area).
 	Assuming each spin is random, it will select a random gene with the desired bias according to their fitness levels.
 	'''
-	# use weighted probabily to select a gene (roulette wheel)
-	return np.random.choice(range(len(fitnesses)), p=[fitness/fit_sum for fitness in fitnesses])
+	# use weighted probability to select a gene (roulette wheel)
+	return np.random.choice(range(len(fitnesses)), p=[fitness / fit_sum for fitness in fitnesses])
 
-
-def crossover(a: int, b: int, pool: Population):
+def crossover(g1: Gene, g2: Gene):
 	'''
 	Given `2` genes `g1` and `g2` which were selected through the selection process.
 	Randomly pick a cut out of the `4` expressions.
@@ -118,17 +115,12 @@ def crossover(a: int, b: int, pool: Population):
 	`buy_trigger = A and B or C and D`,
 	`sell_trigger = E and F or G and H`,
  	'''
-	g1, g2 = pool[a], pool[b]
 	expressions1 = get_indicator_and_candle_values_from_gene(g1)
 	expressions2 = get_indicator_and_candle_values_from_gene(g2)
 	cut = random.choice(range(1, 7))
 	A, B, C, D, E, F, G, H = expressions1[:cut] + expressions2[cut:]
 	I, J, K, L, M, N, O, P = expressions2[:cut] + expressions1[cut:]
-
-	cross_g1 =  copy.deepcopy([ [[A, B], [C, D]], [[E, F], [G, H]] ])
-	cross_g2 = copy.deepcopy([ [[I, J], [K, L]], [[M, N], [O, P]] ])
-
-	return cross_g1, cross_g2
+	return copy.deepcopy([[[A, B], [C, D]], [[E, F], [G, H]]]), copy.deepcopy([[[I, J], [K, L]], [[M, N], [O, P]]])
 
 def mutation(pool: Population, n_mutations = 5, mutation_std = 1):
 	'''
@@ -146,4 +138,4 @@ def mutation(pool: Population, n_mutations = 5, mutation_std = 1):
 def format_trigger(expressions: list[Expression]):
 	format_exp = lambda exp: f'{exp[0]} > {exp[1]:.5f} * {exp[2]}'
 	formatted = list(map(format_exp, [exp for exp in expressions]))
-	return '( {} & {} ) || ( {} & {} )'.format(*formatted)
+	return '( {} && {} ) || ( {} && {} )'.format(*formatted)
