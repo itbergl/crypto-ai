@@ -1,7 +1,7 @@
 import pandas as pd
 from tqdm import tqdm
 from data import retrieve_data, list_indicators_and_candle_values, add_all_indicators, save_data
-from genetic import Population, format_trigger, get_expression, rand_trigger, evaluate, selection, crossover, mutation, get_indicator_and_candle_values_from_gene
+from genetic import Population, format_trigger, get_expression, rand_trigger, evaluate, selection, crossover, mutation, get_indicator_and_candle_values_from_gene, fitness
 import random
 import optuna
 import copy
@@ -29,16 +29,21 @@ DEFAULT_PARAMS = {
 
 # Defines the searchspace for OPTUNA
 OPTUNA_SEARCHSPACE = {
-	'MUTATION_STD': [_ for _ in range(1, 6)],
-	'N_MUTATIONS': [_ for _ in range(5, 20, 5)],
-	'N_CROSSOVER': [_ for _ in range(100, POPULATION, 100)],
+	'MUTATION_STD': [_ for _ in np.linspace(0.1, 3, 20)],
+	'N_MUTATIONS': [_ for _ in range(5, 25)],
+	'N_CROSSOVER': [_ for _ in range(100, POPULATION, 25)],
 }
 
 
 def run(df_rows: list, indicators_and_candle_values, trial: optuna.trial=None):
 	reset_seed()
 	# select parameters
-	params = DEFAULT_PARAMS if trial is None else {k: trial.suggest_int(k, OPTUNA_SEARCHSPACE[k][0], OPTUNA_SEARCHSPACE[k][-1]) for k in OPTUNA_SEARCHSPACE}
+	optuna_params = {
+		'MUTATION_STD': trial.suggest_float('MUTATION_STD', OPTUNA_SEARCHSPACE['MUTATION_STD'][0], OPTUNA_SEARCHSPACE['MUTATION_STD'][-1]),
+		'N_MUTATIONS': trial.suggest_int('N_MUTATIONS', OPTUNA_SEARCHSPACE['N_MUTATIONS'][0], OPTUNA_SEARCHSPACE['N_MUTATIONS'][-1]),
+		'N_CROSSOVER': trial.suggest_int('N_CROSSOVER', OPTUNA_SEARCHSPACE['N_CROSSOVER'][0], OPTUNA_SEARCHSPACE['N_CROSSOVER'][-1]),
+	}
+	params = DEFAULT_PARAMS if trial is None else optuna_params
 
 	# Initialise gene pools
 	pool: Population = [
@@ -49,7 +54,7 @@ def run(df_rows: list, indicators_and_candle_values, trial: optuna.trial=None):
 		for _ in range(POPULATION)
 	]
 
-	next_gen: Population = [[] for _ in range(POPULATION)]
+	next_gen: Population = [gene for gene in pool]
 
 	# Record bot values for visualisation
 	bot_record = []
@@ -57,13 +62,15 @@ def run(df_rows: list, indicators_and_candle_values, trial: optuna.trial=None):
 	epochs = range(MAX_ITER) if trial is not None else tqdm(range(MAX_ITER), total=MAX_ITER)
 	for epoch in epochs:
 		# Shuffle the pool to avoid bias
-		A = pool[0]
 		random.shuffle(pool)
 		max_pos, max_fit, fit_sum, fitnesses = evaluate(df_rows, pool, indicators_and_candle_values)
 
 		# report to optuna
 		if trial is not None:
-			trial.report(max_fit, epoch)
+			trial.report(fit_sum/len(pool), epoch)
+
+			if epoch > 10 and trial.should_prune():
+				raise optuna.TrialPruned()
 
 		# append the value record of the best bot
 		bot_record.append({'max_pos': max_pos, 'max_fit': max_fit, 'fit_sum': fit_sum, 'fitnesses': fitnesses})
@@ -86,7 +93,7 @@ def run(df_rows: list, indicators_and_candle_values, trial: optuna.trial=None):
 	if trial is None:
 		return (max_pos, max_fit, fit_sum, fitnesses), bot_record, pool
 	else:
-		return max_fit
+		return fit_sum/len(pool)
 
 if __name__=='__main__':
 	# Allow printing the entire data frame
@@ -100,15 +107,22 @@ if __name__=='__main__':
 	df.to_csv('data.csv', index=False)
 	df_rows = [row for _, row in df.iterrows()]
 
+	df_rows_training, df_rows_testing = df_rows[:int(len(df_rows) * 0.8)], df_rows[int(len(df_rows) * 0.8):]
+
 	# Run the genetic algorithm with default values
 	if not USE_OPTUNA:
-		(max_pos, max_fit, fit_sum, fitnesses), bot_record, pool = run(df_rows, indicators_and_candle_values)
-		print(f'best bot earns ${max_fit:.5f}')
-		expressions = [get_expression(expression, indicators_and_candle_values) for expression in get_indicator_and_candle_values_from_gene(pool[max_pos])]
-		print(f'buy trigger: {format_trigger(expressions[:4])}')
-		print(f'sell trigger: {format_trigger(expressions[4:])}')
+		for data, df_rows in zip(['training', 'testing'], [df_rows_training, df_rows_testing]):
+			print(f'[{data} set ]')
 
-		save_data('bot_record.csv', bot_record)
+			(max_pos, max_fit, fit_sum, fitnesses), bot_record, pool = run(df_rows, indicators_and_candle_values)
+			expressions = [get_expression(expression, indicators_and_candle_values) for expression in get_indicator_and_candle_values_from_gene(pool[max_pos])]
+			print(f'buy trigger: {format_trigger(expressions[:4])}')
+			print(f'sell trigger: {format_trigger(expressions[4:])}')
+
+			print(f'best bot earns ${max_fit:.5f}')
+			print()
+
+			save_data(f'bot_record_{data}.csv', bot_record)
 
 	# do a hyperparameter search with OPTUNA
 	else:
@@ -118,4 +132,16 @@ if __name__=='__main__':
 									storage = f'sqlite:///optuna.db',
 									study_name = f'seed_{SEED:05}',
 								   )
-		study.optimize(lambda trial: run(df_rows, indicators_and_candle_values, trial=trial))
+		study.optimize(lambda trial: run(df_rows_training, indicators_and_candle_values, trial=trial))
+
+		DEFAULT_PARAMS = study.best_trial.params
+		(max_pos, max_fit, fit_sum, fitnesses), bot_record, pool = run(df_rows_testing, indicators_and_candle_values)
+		expressions = [get_expression(expression, indicators_and_candle_values) for expression in get_indicator_and_candle_values_from_gene(pool[max_pos])]
+		print(f'[Test set ]')
+		print(f'buy trigger: {format_trigger(expressions[:4])}')
+		print(f'sell trigger: {format_trigger(expressions[4:])}')
+
+		print(f'best bot earns ${max_fit:.5f}')
+		print()
+
+		save_data(f'bot_record_testing.csv', bot_record)

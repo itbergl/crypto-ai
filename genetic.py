@@ -126,14 +126,13 @@ def mutation(pool: Population, n_mutations = 5, mutation_std = 1):
 	'''
 	Randomly change the constant value in one of the 8 expressions in a small percentage of the genes picked randomly from the population.
  	'''
-	# NOTE: this for some reason is decreasing our max_fitness
 	for _ in range(n_mutations):
 		# for any non-maximal gene
 		i = random.randrange(1, len(pool))
 		a,b,c = [random.choice([0,1]) for _ in range(3)]
 		expression = pool[i][a][b][c]
 
-		expression[1] = np.random.normal(expression[1], mutation_std, 1)[0]
+		expression[1] = np.random.normal(0, mutation_std, 1)[0]
 
 def format_trigger(expressions: list[Expression]):
 	format_exp = lambda exp: f'{exp[0]} > {exp[1]:.5f} * {exp[2]}'
