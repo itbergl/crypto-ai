@@ -1,4 +1,3 @@
-*.db
 *.csv
 /__pycache__
 /result
