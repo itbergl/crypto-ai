@@ -34,7 +34,6 @@ OPTUNA_SEARCHSPACE = {
 	'N_CROSSOVER': [_ for _ in range(100, POPULATION, 25)],
 }
 
-
 def run(df_rows: list, indicators_and_candle_values, trial: optuna.trial=None):
 	reset_seed()
 	# select parameters
@@ -124,5 +123,3 @@ if __name__=='__main__':
 									study_name = f'seed_{SEED:05}',
 								   )
 		study.optimize(lambda trial: run(df_rows, indicators_and_candle_values, trial=trial))
-
-		DEFAULT_PARAMS = study.best_trial.params

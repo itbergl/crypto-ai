@@ -14,6 +14,13 @@ def retrieve_data():
 
     return df
 
+def save_data(filename: str, bot_record: list):
+    dir_path = os.getcwd() + '/result'
+
+    if not os.path.exists(dir_path):
+        os.makedirs(dir_path)
+    pd.DataFrame(bot_record).to_csv(dir_path + '/' + filename, index=True, index_label='Epoch')
+
 def add_all_indicators(df: pd.DataFrame, indicators_and_candle_values: StrSeriesPairs):
     for col, value in indicators_and_candle_values[:-5]:
         df[col] = value
@@ -94,10 +101,3 @@ def list_indicators_and_candle_values(df: pd.DataFrame) -> StrSeriesPairs:
         ('close', df['close']),
         ('volume', df['volume']),
     ]
-
-def save_data(filename: str, bot_record: list):
-    dir_path = os.getcwd() + '/result'
-
-    if not os.path.exists(dir_path):
-        os.makedirs(dir_path)
-    pd.DataFrame(bot_record).to_csv(dir_path + '/' + filename, index=True, index_label='Epoch')

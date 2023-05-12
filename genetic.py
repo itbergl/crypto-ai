@@ -33,7 +33,6 @@ def rand_expression(indicators_and_candle_values: StrSeriesPairs) -> Literal:
 
 	return [lhs, c, rhs]
 
-
 def evaluate(df_rows: pd.Series, pool: Population, indicators_and_candle_values: StrSeriesPairs):
 	'''
 	Call the fitness evaluation for each gene in the pool and return the restuls in fitnesses.
