@@ -97,7 +97,7 @@ def selection(fit_sum: float, fitnesses: list[float]):
 	'''
 	Implement wheel of fitness to select a random gene biased to reflect its fitness.
 	Wheel segments are covered with gene symbols, where the segment size matches the relative fitness level (twice the fitness means twice the area).
-	Assuming each spin is random, it will select a random gene with the desired bias according to their fitness levels.
+	Assuming each spin is random, it will select a random gene with the desired bias according to their fitness level.
 	'''
 	return np.random.choice(range(len(fitnesses)), p=[fitness / fit_sum for fitness in fitnesses])
 

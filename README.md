@@ -19,3 +19,5 @@ Run with the default hyperparameters which is the most optimal determined by the
 ```bash
 python main.py
 ```
+
+Visualise the last run of the Genetic Algorithm by opening [the jupyter notebook](visual.ipynb) and run all cells.
