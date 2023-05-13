@@ -49,7 +49,7 @@ def get_indicator_and_candle_values_from_gene(gene: Gene) -> list[Literal]:
 	Return the buy and sell triggers in the expression of:
 	`buy_trigger = A and B or C and D`,
 	`sell_trigger = E and F or G and H`,
-	where A, B, C, D, E, F, G, H are expressions in the form of `a > b * c`
+	where A, B, C, D, E, F, G, H are expressions in the form of `a > c * b`.
 	'''
 	buy_trigger, sell_trigger = gene
 	buy_conj1, buy_conj2 = buy_trigger
@@ -64,13 +64,11 @@ def get_expression(expression: Literal, indicators_and_candle_values: StrSeriesP
 	a, b, c = expression
 	return indicators_and_candle_values[a][0], b, indicators_and_candle_values[c][0]
 
-def evaluate_expressions(row, expressions: list[Expression]):
+def evaluate_trigger(row, trigger: list[Expression]):
 	'''
-	Evaluate the expressions of `A > c * B` where `A` and `B` are indicator or candle values.
-
-	nans should return False.
+	Evaluate a trigger, return False if any of the values is `nan`.
 	'''
-	return all(map(lambda exp: row[exp[0]] > exp[1]*row[exp[2]], expressions))
+	return all(map(lambda exp: row[exp[0]] > exp[1] * row[exp[2]], trigger))
 
 def fitness(df_rows: pd.Series, gene: Gene, indicators_and_candle_values: StrSeriesPairs) -> float:
 	'''
@@ -79,18 +77,17 @@ def fitness(df_rows: pd.Series, gene: Gene, indicators_and_candle_values: StrSer
 	amount = 100.
 	buy_trigger = False
 	expressions = [get_expression(expression, indicators_and_candle_values) for expression in get_indicator_and_candle_values_from_gene(gene)]
-	buy_triggers, sell_triggers = expressions[:4], expressions[4:]
 	for row in df_rows:
 		if not buy_trigger:
-			if evaluate_expressions(row, buy_triggers):
+			if evaluate_trigger(row, expressions[:4]):
 				amount -= amount * 0.02
 				amount /= row['close']
 				buy_trigger = True
 		else:
-			if evaluate_expressions(row, sell_triggers):
+			if evaluate_trigger(row, expressions[4:]):
 				amount *= row['close'] * (1 - 0.02)
 				buy_trigger = False
-	# force sell at the end
+	# Force sell at the end
 	if buy_trigger:
 		amount *= row['close'] * (1 - 0.02)
 
@@ -102,7 +99,6 @@ def selection(fit_sum: float, fitnesses: list[float]):
 	Wheel segments are covered with gene symbols, where the segment size matches the relative fitness level (twice the fitness means twice the area).
 	Assuming each spin is random, it will select a random gene with the desired bias according to their fitness levels.
 	'''
-	# use weighted probability to select a gene (roulette wheel)
 	return np.random.choice(range(len(fitnesses)), p=[fitness / fit_sum for fitness in fitnesses])
 
 def crossover(g1: Gene, g2: Gene):
@@ -126,7 +122,7 @@ def mutation(pool: Population, n_mutations = 5, mutation_std = 1):
 	Randomly change the constant value in one of the 8 expressions in a small percentage of the genes picked randomly from the population.
  	'''
 	for _ in range(n_mutations):
-		# for any non-maximal gene
+		# Skip the first one so that the best gene will never be mutated
 		i = random.randrange(1, len(pool))
 		a,b,c = [random.choice([0,1]) for _ in range(3)]
 		expression = pool[i][a][b][c]

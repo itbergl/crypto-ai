@@ -7,5 +7,4 @@ optuna-dashboard
 tqdm
 matplotlib
 seaborn
-scipy
 empiricaldist

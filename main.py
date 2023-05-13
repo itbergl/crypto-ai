@@ -1,30 +1,28 @@
 import pandas as pd
+import numpy as np
 from tqdm import tqdm
 from data import retrieve_data, list_indicators_and_candle_values, add_all_indicators, save_data
 from genetic import Population, format_trigger, get_expression, rand_trigger, evaluate, selection, crossover, mutation, get_indicator_and_candle_values_from_gene, fitness
 import random
 import optuna
 import copy
-import numpy as np
+import sys
 
-# Constants
 MAX_ITER = 30
 POPULATION = 501
+USE_OPTUNA = True if len(sys.argv) == 2 and sys.argv[1] == 'Optuna' else False
 
-# SEED
-# seeding to ensure same initial conditions
+# Seeding to ensure same initial conditions
 SEED = random.randint(0, 100000)
 def reset_seed():
 	random.seed(SEED)
 	np.random.seed(SEED)
 
-USE_OPTUNA = True
-
-# Used when not using OPTUNA
+# Used when USE_OPTUNA is False
 DEFAULT_PARAMS = {
 	'MUTATION_STD': 1.5, # The standard deviation of the normal distribution used to mutate
 	'N_MUTATIONS': 15, # The number of genes to mutate
-	'N_CROSSOVER': 250, # The number of crossovers
+	'N_CROSSOVER': 250, # The number of genes to crossover
 }
 
 # Defines the searchspace for OPTUNA
@@ -36,7 +34,6 @@ OPTUNA_SEARCHSPACE = {
 
 def run(df_rows: list, indicators_and_candle_values, trial: optuna.trial=None):
 	reset_seed()
-	# select parameters
 	params = DEFAULT_PARAMS if trial is None else {
 		'MUTATION_STD': trial.suggest_float('MUTATION_STD', OPTUNA_SEARCHSPACE['MUTATION_STD'][0], OPTUNA_SEARCHSPACE['MUTATION_STD'][-1]),
 		'N_MUTATIONS': trial.suggest_int('N_MUTATIONS', OPTUNA_SEARCHSPACE['N_MUTATIONS'][0], OPTUNA_SEARCHSPACE['N_MUTATIONS'][-1]),
@@ -63,14 +60,14 @@ def run(df_rows: list, indicators_and_candle_values, trial: optuna.trial=None):
 		random.shuffle(pool)
 		max_pos, max_fit, fit_sum, fitnesses = evaluate(df_rows, pool, indicators_and_candle_values)
 
-		# report to optuna
+		# Report to optuna
 		if trial is not None:
 			trial.report(fit_sum/len(pool), epoch)
 
 			if epoch > 10 and trial.should_prune():
 				raise optuna.TrialPruned()
 
-		# append the value record of the best bot
+		# Append the value record of the best bot
 		bot_record.append({'max_pos': max_pos, 'max_fit': max_fit, 'fit_sum': fit_sum, 'fitnesses': fitnesses})
 
 		# Preserve the best gene for the next generation
@@ -91,7 +88,7 @@ def run(df_rows: list, indicators_and_candle_values, trial: optuna.trial=None):
 	if trial is None:
 		return (max_pos, max_fit, fit_sum, fitnesses), bot_record, pool
 	else:
-		return fit_sum/len(pool)
+		return fit_sum / len(pool)
 
 if __name__=='__main__':
 	# Allow printing the entire data frame
@@ -114,12 +111,12 @@ if __name__=='__main__':
 		print(f'best bot earns ${max_fit:.5f}')
 		save_data(f'bot_record.csv', bot_record)
 
-	# do a hyperparameter search with OPTUNA
+	# Do a hyperparameter search with Optuna
 	else:
 		study = optuna.create_study(direction="maximize",
 									sampler = optuna.samplers.GridSampler(search_space=OPTUNA_SEARCHSPACE),
 									pruner = optuna.pruners.MedianPruner(),
-									storage = f'sqlite:///optuna.db',
+									storage = f'sqlite:///db.sqlite3',
 									study_name = f'seed_{SEED:05}',
 								   )
 		study.optimize(lambda trial: run(df_rows, indicators_and_candle_values, trial=trial))

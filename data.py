@@ -25,7 +25,7 @@ def add_all_indicators(df: pd.DataFrame, indicators_and_candle_values: StrSeries
     for col, value in indicators_and_candle_values[:-5]:
         df[col] = value
 
-    # normalize by the first non-nan value
+    # Normalise by the first non-nan value
     for col in df.columns:
         first_value = df[col].loc[~df[col].isnull()].iloc[0]
         df[col] /= first_value

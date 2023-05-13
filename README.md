@@ -1,9 +1,21 @@
-# Crypto-AI
+# CITS4404 Project
 
-An AI bitcoin price predictor for CITS4404 - AI and Adaptive Systems, Assignment 2.
+## Setup
 
-## Contributors
+Install required packages.
 
-- itbergl (22710992@student.uwa.edu.au)
-- moebuta - wenxiao (22792191@student.uwa.edu.au)
-- Kaiqi-Liang (kaiqi.liang@outlook.com)
+```bash
+pip install -r requirements.txt
+```
+
+Run `Optuna` study to optimise the hyperparameters.
+
+```bash
+python main.py Optuna
+```
+
+Run with the default hyperparameters which is the most optimal determined by the previous `Optuna` study conducted by us to find a candidate solution.
+
+```bash
+python main.py
+```
