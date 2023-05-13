@@ -22,9 +22,9 @@ USE_OPTUNA = True
 
 # Used when not using OPTUNA
 DEFAULT_PARAMS = {
-	'MUTATION_STD': 1,	# The standard deviation of the normal distribution used to mutate
-	'N_MUTATIONS': 5, # The number of genes to mutate
-	'N_CROSSOVER': 500, # The number of crossovers
+	'MUTATION_STD': 1.5, # The standard deviation of the normal distribution used to mutate
+	'N_MUTATIONS': 15, # The number of genes to mutate
+	'N_CROSSOVER': 250, # The number of crossovers
 }
 
 # Defines the searchspace for OPTUNA
@@ -52,7 +52,7 @@ def run(df_rows: list, indicators_and_candle_values, trial: optuna.trial=None):
 		for _ in range(POPULATION)
 	]
 
-	next_gen: Population = [gene for gene in pool]
+	next_gen: Population = copy.deepcopy(pool)
 
 	# Record bot values for visualisation
 	bot_record = []
@@ -83,7 +83,7 @@ def run(df_rows: list, indicators_and_candle_values, trial: optuna.trial=None):
 
 		# Mutate a small number of the population randomly
 		mutation(next_gen, n_mutations = params['N_MUTATIONS'], mutation_std = params['MUTATION_STD'])
-		pool = next_gen
+		pool = copy.deepcopy(next_gen)
 
 	# Print out the best gene after all the evolution
 	max_pos, max_fit, fit_sum, fitnesses = evaluate(df_rows, pool, indicators_and_candle_values)
